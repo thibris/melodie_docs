@@ -2,5 +2,4 @@
 *.log
 *.txt
 przepisy/*
-apps/*
-**/*.mp3
+apps/gis_checker/firebase_service_account.json

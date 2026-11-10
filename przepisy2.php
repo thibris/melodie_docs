@@ -24,35 +24,59 @@
 
   $selected = isset($_GET['katalog']) ? basename($_GET['katalog']) : null;
 
-  function loadMarkdown($path, $Parsedown) {
-    if (file_exists($path)) {
-      return $Parsedown->text(file_get_contents($path));
-    }
-    return "<p><i>Brak pliku: " . htmlspecialchars(basename($path)) . "</i></p>";
+  // function loadMarkdown($path, $Parsedown) {
+    // if (file_exists($path)) {
+      // return $Parsedown->text(file_get_contents($path));
+    // }
+    // return "<p><i>Brak pliku: " . htmlspecialchars(basename($path)) . "</i></p>";
+  // }
+
+
+  function loadMarkdown($path, $Parsedown)
+  {
+      if (!file_exists($path)) {
+          return "<p><i>Brak pliku: " . htmlspecialchars(basename($path)) . "</i></p>";
+      }
+
+      $markdown = file_get_contents($path);
+
+      // katalog pliku md względem katalogu strony
+      $relativeDir = str_replace(
+          str_replace('\\', '/', __DIR__) . '/',
+          '',
+          str_replace('\\', '/', dirname($path))
+      );
+
+      $markdown = preg_replace_callback(
+          '/!\[(.*?)\]\((.*?)\)/',
+          function ($m) use ($relativeDir) {
+
+              $src = trim($m[2]);
+
+              // URL zewnętrzne zostaw bez zmian
+              if (preg_match('#^(https?:)?//#', $src)) {
+                  return $m[0];
+              }
+
+              // Dopisz katalog przepisu tylko dla lokalnych plików
+              if (!str_contains($src, '/')) {
+                  $src = $relativeDir . '/' . $src;
+              }
+
+              // Kodowanie spacji i polskich znaków
+              $src = implode('/',
+                  array_map('rawurlencode', explode('/', $src))
+              );
+
+              return '![' . $m[1] . '](' . $src . ')';
+          },
+          $markdown
+      );
+
+      return $Parsedown->text($markdown);
   }
 
-  function loadImages($folder) {
-    if (!is_dir($folder)) {
-      return [];
-    }
 
-    $files = scandir($folder);
-    $out = [];
-    $exts = ['jpg','jpeg','png','gif','webp'];
-
-    foreach ($files as $f) {
-      if ($f === '.' || $f === '..') continue;
-      $path = $folder . '/' . $f;
-      if (!is_file($path)) continue;
-
-      $ext = strtolower(pathinfo($f, PATHINFO_EXTENSION));
-      if (in_array($ext, $exts, true)) {
-          $out[] = $path;
-        }
-    }
-
-    return $out;
-  }
 ?>
 <!DOCTYPE html>
 <html lang="pl">
@@ -186,7 +210,6 @@
     $folder = $baseDir . "/" . $selected;
     $lista = loadMarkdown($folder . "/lista.md", $Parsedown);
     $przepis = loadMarkdown($folder . "/przepis.md", $Parsedown);
-    $images = loadImages($folder);
 ?>
 <div id="container">
     <div id="lista">
@@ -195,15 +218,6 @@
 
     <div id="przepis">
         <?= $przepis ?>
-
-        <?php if ($images): ?>
-        <h2>Zdjęcia</h2>
-        <div class="gallery">
-            <?php foreach ($images as $img): ?>
-                <img src="przepisy2/<?= htmlspecialchars($selected) ?>/<?= htmlspecialchars(basename($img)) ?>">
-            <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
     </div>
 </div>
 
